@@ -30,14 +30,32 @@ export class RestAPIStack extends cdk.Stack {
       tableName: "MovieCast",
     });
 
-    movieCastsTable.addLocalSecondaryIndex({
-      indexName: "roleIx",
+    // 添加 `movieCastIndex` 索引，允许按 `movieId` 查询演员
+    movieCastsTable.addGlobalSecondaryIndex({
+      indexName: "movieCastIndex",
+      partitionKey: { name: "movieId", type: dynamodb.AttributeType.NUMBER },
       sortKey: { name: "roleName", type: dynamodb.AttributeType.STRING },
     });
 
 
     
     // Functions 
+    // const getMovieByIdFn = new lambdanode.NodejsFunction(
+    //   this,
+    //   "GetMovieByIdFn",
+    //   {
+    //     architecture: lambda.Architecture.ARM_64,
+    //     runtime: lambda.Runtime.NODEJS_18_X,
+    //     entry: `${__dirname}/../lambdas/getMovieById.ts`,
+    //     timeout: cdk.Duration.seconds(10),
+    //     memorySize: 128,
+    //     environment: {
+    //       TABLE_NAME: moviesTable.tableName,
+    //       REGION: 'eu-west-1',
+    //     },
+    //   }
+    //   );
+
     const getMovieByIdFn = new lambdanode.NodejsFunction(
       this,
       "GetMovieByIdFn",
@@ -49,10 +67,11 @@ export class RestAPIStack extends cdk.Stack {
         memorySize: 128,
         environment: {
           TABLE_NAME: moviesTable.tableName,
+          CAST_TABLE_NAME: movieCastsTable.tableName,  // 添加演员表环境变量
           REGION: 'eu-west-1',
         },
       }
-      );
+    );
       
       const getAllMoviesFn = new lambdanode.NodejsFunction(
         this,
@@ -133,6 +152,7 @@ export class RestAPIStack extends cdk.Stack {
         moviesTable.grantReadWriteData(newMovieFn)
         moviesTable.grantReadWriteData(deleteMovieFn)
         movieCastsTable.grantReadData(getMovieCastMembersFn);
+        movieCastsTable.grantReadData(getMovieByIdFn); // 允许查询 MovieCast 表
 
         // REST API 
     const api = new apig.RestApi(this, "RestAPI", {
